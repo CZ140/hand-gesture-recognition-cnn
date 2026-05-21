@@ -21,29 +21,27 @@ For best results:
 """
 
 import cv2
-import os
-import glob
 from pathlib import Path
 
 # ── Define your gesture classes here ─────────────────────────────────────────
 # Use simple lowercase names — these become the class labels the model predicts.
 GESTURE_CLASSES = [
-    'palm',   # open flat hand
-    'fist',   # closed fist
-    'index',  # one finger pointing up
-    'thumb',  # thumbs up
-    'ok',     # ok / circle sign
-    'l',      # L-shape (index + thumb out)
-    'c',      # curved C shape
-    'down',   # pointing down
-    'peace',  # peace sign or number 2
-    'three',  # the number 3 on your hand
-    'four',   # the number 4 on your hand
-    'cross',  # crossing your index and middle finger
-    'rock',   # index and pinky up with or without thumb out
-    'thumbs_down', # thumbs down
-    'back_hand',  # the back of your hand
-    'hand-heart', # thumb and index finger put together to make a heart
+    'palm',       # open flat hand
+    'fist',       # closed fist
+    'index',      # one finger pointing up
+    'thumb',      # thumbs up
+    'ok',         # ok / circle sign
+    'l',          # L-shape (index + thumb out)
+    'c',          # curved C shape
+    'down',       # pointing down
+    'peace',      # peace sign or number 2
+    'three',      # the number 3 on your hand
+    'four',       # the number 4 on your hand
+    'cross',      # crossing your index and middle finger
+    'rock',       # index and pinky up with or without thumb out
+    'thumbs_down',  # thumbs down
+    'back_hand',    # the back of your hand
+    'hand-heart',   # thumb and index finger put together to make a heart
 ]
 
 IMAGES_PER_CLASS = 300   # how many frames to collect per gesture
@@ -56,9 +54,24 @@ AUTO_CAPTURE_FPS = 5     # frames per second when holding H
 def count_existing(folder: Path) -> int:
     return len(list(folder.glob('*.png')))
 
+
 def delete_class_images(folder: Path):
     for f in folder.glob('*.png'):
         f.unlink()
+
+
+def save_frame(raw_frame, coords, folder: Path, count: int) -> bool:
+    """Crop, convert to grayscale, resize, and save one frame. Returns True on success."""
+    x1, y1, x2, y2 = coords
+    crop    = raw_frame[y1:y2, x1:x2]
+    gray    = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    resized = cv2.resize(gray, (IMG_SIZE, IMG_SIZE))
+    filename = folder / f'frame_{count:04d}.png'
+    ok = cv2.imwrite(str(filename), resized)
+    if not ok:
+        print(f'\nWARNING: Failed to save {filename} — check disk space and permissions.')
+    return ok
+
 
 def draw_ui(frame, gesture_name, count, target, auto_mode):
     h, w = frame.shape[:2]
@@ -123,13 +136,17 @@ def collect():
         auto_interval  = max(1, int(30 / AUTO_CAPTURE_FPS))  # frames between auto-captures
 
         while count < IMAGES_PER_CLASS:
-            ret, frame = cap.read()
+            ret, raw_frame = cap.read()
             if not ret:
                 print('Failed to grab frame.')
                 break
 
-            frame, (x1, y1, x2, y2) = draw_ui(frame, gesture_name, count, IMAGES_PER_CLASS, auto_mode)
-            cv2.imshow('Gesture Collection', frame)
+            # Draw UI annotations on a copy so the raw frame stays clean for saving
+            display_frame = raw_frame.copy()
+            display_frame, coords = draw_ui(
+                display_frame, gesture_name, count, IMAGES_PER_CLASS, auto_mode
+            )
+            cv2.imshow('Gesture Collection', display_frame)
 
             key = cv2.waitKey(1) & 0xFF
 
@@ -138,26 +155,17 @@ def collect():
                 auto_ticker += 1
                 if auto_ticker >= auto_interval:
                     auto_ticker = 0
-                    crop    = frame[y1:y2, x1:x2]
-                    gray    = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-                    resized = cv2.resize(gray, (IMG_SIZE, IMG_SIZE))
-                    filename = save_folder / f'frame_{count:04d}.png'
-                    cv2.imwrite(str(filename), resized)
-                    count += 1
+                    if save_frame(raw_frame, coords, save_folder, count):
+                        count += 1
 
             if key == ord('h') or key == ord('H'):
                 auto_mode   = True
                 auto_ticker = 0
             elif key == ord(' '):
-                # Manual single capture
                 auto_mode = False
-                crop    = frame[y1:y2, x1:x2]
-                gray    = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-                resized = cv2.resize(gray, (IMG_SIZE, IMG_SIZE))
-                filename = save_folder / f'frame_{count:04d}.png'
-                cv2.imwrite(str(filename), resized)
-                count += 1
-                print(f'  Captured {count}/{IMAGES_PER_CLASS}', end='\r')
+                if save_frame(raw_frame, coords, save_folder, count):
+                    count += 1
+                    print(f'  Captured {count}/{IMAGES_PER_CLASS}', end='\r')
             elif key == ord('n') or key == ord('N'):
                 print(f'\n  Skipping to next gesture with {count} images saved.')
                 break
