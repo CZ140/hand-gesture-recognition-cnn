@@ -13,9 +13,9 @@
 </p>
 
 <p align="center">
-  <img src="gradcam_samples.png" width="600" alt="GradCAM visualization showing what the model focuses on"/>
+  <img src="final_confusion_matrix.png" width="650" alt="Confusion matrix — 99.79% test accuracy"/>
   <br/>
-  <em>GradCAM — the model's attention overlaid on live webcam frames. Each prediction is 100% confident.</em>
+  <em>Test set confusion matrix — 479 out of 480 samples correct across all 16 gesture classes.</em>
 </p>
 
 ---
@@ -74,12 +74,6 @@ Total trainable parameters: ~8.4M
 </p>
 
 Validation accuracy breaks 98% by epoch 5 and converges to ~100% by epoch 20. The scheduler's LR reductions are visible as the sharp drops in training loss around epochs 15–25.
-
-### Confusion Matrix — Test Set
-
-<p align="center">
-  <img src="final_confusion_matrix.png" width="650" alt="Confusion matrix — 99.79% accuracy"/>
-</p>
 
 **Only 1 misclassification out of 480 test samples.** The model confused `back_hand` with `ok` once — two gestures that share similar finger curvature from certain angles.
 
